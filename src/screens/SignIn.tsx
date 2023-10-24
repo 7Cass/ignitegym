@@ -1,4 +1,4 @@
-import { Center, Heading, Image, ScrollView, Text, VStack } from 'native-base';
+import { Center, Heading, Image, ScrollView, Text, VStack, useToast } from 'native-base';
 
 import LogoSvg from '@assets/logo.svg';
 import BackgroundImg from '@assets/background.png';
@@ -7,12 +7,55 @@ import { Input } from '@components/Input';
 import { Button } from '@components/Button';
 import { useNavigation } from '@react-navigation/native';
 import { AuthNavigatorRoutesProps } from '@routes/auth.routes';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
+import { Controller, useForm } from 'react-hook-form';
+import { AppError } from '@utils/AppError';
+import { useAuth } from '@hooks/UseAuth';
+import { useState } from 'react';
+
+type FormDataProps = {
+  email: string;
+  password: string;
+};
+
+const signInSchema = yup.object({
+  email: yup.string().required('Informe o e-mail.').email('E-mail inválido.'),
+  password: yup.string().required('Informe a senha.'),
+});
 
 export function SignIn() {
+  const [isLoading, setIsLoading] = useState(false);
+  const { signIn } = useAuth();
+
+  const toast = useToast();
+  const { control, handleSubmit, formState: { errors } } = useForm<FormDataProps>({
+    resolver: yupResolver(signInSchema)
+  });
+
   const navigation = useNavigation<AuthNavigatorRoutesProps>();
 
   function handleNewAccount() {
     navigation.navigate("signUp");
+  }
+
+  async function handleSignIn({ email, password }: FormDataProps) {
+    try {
+      setIsLoading(true);
+      
+      await signIn(email, password);
+    } catch (error) {
+      const isAppError = error instanceof AppError;
+      const title = isAppError ? error.message : 'Não foi possível entrar. Tente novamente mais tarde.'
+      
+      setIsLoading(false);
+
+      toast.show({
+        title,
+        placement: 'top',
+        bgColor: 'red.500'
+      });
+    }
   }
 
   return (
@@ -39,17 +82,36 @@ export function SignIn() {
         <Center>
           <Heading color="gray.100" fontSize="xl" mb={6} fontFamily="heading">Acesse sua conta</Heading>
 
-          <Input 
-            placeholder="E-mail"
-            keyboardType="email-address"
-            autoCapitalize="none"
+          <Controller 
+            control={control}
+            name="email"
+            rules={{ required: 'Informe o e-mail' }}
+            render={({ field: { onChange } }) => (
+              <Input 
+                placeholder="E-mail" 
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onChangeText={onChange}
+                errorMessage={errors.email?.message}
+              />
+            )}
           />
-          <Input 
-            placeholder="Senha"
-            secureTextEntry
+          
+          <Controller 
+            control={control}
+            name="password"
+            rules={{ required: 'Informe a senha' }}
+            render={({ field: { onChange } }) => (
+              <Input 
+                placeholder="Senha" 
+                secureTextEntry
+                onChangeText={onChange}
+                errorMessage={errors.password?.message}
+              />
+            )}
           />
 
-          <Button title="Acessar"/>
+          <Button title="Acessar" onPress={handleSubmit(handleSignIn)} isLoading={isLoading}/>
         </Center>
 
         <Center mt={20}>
