@@ -1,4 +1,4 @@
-import { Center, Heading, Image, ScrollView, Text, VStack } from 'native-base';
+import { Alert, Center, Heading, Image, ScrollView, Text, VStack, useToast } from 'native-base';
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -9,6 +9,12 @@ import BackgroundImg from '@assets/background.png';
 import { Input } from '@components/Input';
 import { Button } from '@components/Button';
 import { useNavigation } from '@react-navigation/native';
+
+import { api } from '@services/api';
+import axios from 'axios';
+import { AppError } from '@utils/AppError';
+import { useState } from 'react';
+import { useAuth } from '@hooks/UseAuth';
 
 type FormDataProps = {
   name: string;
@@ -25,6 +31,9 @@ const signUpSchema = yup.object({
 });
 
 export function SignUp() {
+  const [isLoading, setIsLoading] = useState(false);
+  const toast = useToast();
+  const { signIn } = useAuth();
   const { control, handleSubmit, formState: { errors } } = useForm<FormDataProps>({
     resolver: yupResolver(signUpSchema)
   });
@@ -35,8 +44,23 @@ export function SignUp() {
     navigation.goBack();
   }
 
-  function handleSignUp({ name, email, password, password_confirm }: FormDataProps) {
+  async function handleSignUp({ name, email, password }: FormDataProps) {
+    try {
+      setIsLoading(true);
+      await api.post('/users', { name, email, password });
+      await signIn(email, password);
+      
+    } catch (error) {
+      setIsLoading(false);
+      const isAppError = error instanceof AppError;
+      const title = isAppError ? error.message : 'Não foi possível criar a conta. Tente novamente mais tarde.'
 
+      toast.show({
+        title,
+        placement: 'top',
+        bgColor: 'red.500'
+      });
+    }
   }
 
   return (
@@ -121,7 +145,7 @@ export function SignUp() {
             )}
           />
 
-          <Button mt={6} title="Criar e acessar" onPress={handleSubmit(handleSignUp)}/>
+          <Button mt={6} title="Criar e acessar" onPress={handleSubmit(handleSignUp)} isLoading={isLoading}/>
         </Center>
 
         <Button title="Voltar para o login" variant="outline" mt={12} onPress={handleGoBack}/>
